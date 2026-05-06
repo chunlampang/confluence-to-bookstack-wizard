@@ -276,6 +276,30 @@ function buildHierarchy(): Map<string | null, PageData[]> {
   rootPages = rootPages.filter(page => hierarchy.has(page.id));
   hierarchy.set(null, rootPages);
 
+  // flatten subpages
+  for (const mainPage of rootPages) {
+    const books = hierarchy.get(mainPage.id) || [];
+    for (const book of books) {
+      const chapters = hierarchy.get(book.id) || [];
+      for (const chapter of chapters) {
+        let flatPages = [];
+
+        const flatten = function (page: PageData, titlePrefix = '') {
+          const subpages = hierarchy.get(page.id) || [];
+          for (const subpage of subpages) {
+            if (titlePrefix)
+              subpage.title = `${titlePrefix} / ${subpage.title}`;
+            flatPages.push(subpage);
+            flatten(subpage, subpage.title);
+          }
+        }
+
+        flatten(chapter);
+        hierarchy.set(chapter.id, flatPages);
+      }
+    }
+  }
+
   return hierarchy;
 }
 
@@ -319,19 +343,20 @@ function buildAttachmentMapping() {
 }
 
 // Create BookStack structure
-async function createBookStackStructure(reporter?: any): Promise<{ shelves: number; books: number; pages: number }> {
+async function createBookStackStructure(reporter?: any): Promise<{ shelves: number; books: number; chapters: number; pages: number }> {
   const hierarchy = buildHierarchy();
   const rootPages = hierarchy.get(null) || [];
 
   // Running counters for live updates
   let shelfCount = 0;
   let bookCount = 0;
+  let chapterCount = 0;
   let pageCount = 0;
 
   const getCounters = () => ({
     shelves: shelfCount,
     books: bookCount,
-    chapters: 0,
+    chapters: chapterCount,
     pages: pageCount
   });
 
@@ -436,6 +461,30 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   if (reporter) reporter.start({ phase: 'pages', message: `Creating ${totalPages} pages...` });
   progress('pages', `Creating ${totalPages} pages...`, 0, totalPages);
 
+  const createPage = async function (page: PageData, params: { [key: string]: any }) {
+    try {
+      const pageBodyHtml = getPageBody(page);
+      const pageHtml = convertStorageToHtml(pageBodyHtml, page.id);
+
+      const pageResp = await axios.createPage({
+        name: page.title,
+        html: pageHtml || '<p></p>',
+        ...params,
+      });
+      pageCount++;
+
+      if (attachmentsByPage[page.id]) {
+        attachmentsByPage[page.id].pageNewId = pageResp.data.id;
+      }
+
+      log(`  ✓ Created page: ${page.title}`, 'success');
+      return true;
+    } catch (err: any) {
+      log(`  ✗ Error creating page ${page.title}: ${err.message}`, 'error');
+      return false;
+    }
+  }
+
   let currentPageIndex = 0;
   for (let i = 0; i < childPages.length; i++) {
     const childPage = childPages[i];
@@ -452,25 +501,31 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
       currentPageIndex++;
       progress('pages', `Creating page ${currentPageIndex}/${totalPages}: ${grandChild.title}`, currentPageIndex, totalPages);
 
-      const grandBodyHtml = getPageBody(grandChild);
-      const grandHtml = convertStorageToHtml(grandBodyHtml, grandChild.id);
+      const subpages = hierarchy.get(grandChild.id) || [];
+      if (subpages.length) {
+        // grandChild as chapter
+        try {
+          const chapterResp = await axios.createChapter({
+            name: grandChild.title,
+            book_id: bookId
+          });
+          chapterCount++;
+          log(`  ✓ Created chapter: ${grandChild.title}`, 'success');
 
-      try {
-        const grandPageResp = await axios.createPage({
-          book_id: bookId,
-          name: grandChild.title,
-          html: grandHtml || '<p></p>'
-        });
-        pageCount++;
+          const params = { chapter_id: chapterResp.data.id };
+          await createPage(grandChild, params); // Create general page for chapter
+          for (let subpage of subpages) { // Create subpage for chapter
+            await createPage(subpage, params);
+          }
 
-        if (attachmentsByPage[grandChild.id]) {
-          attachmentsByPage[grandChild.id].pageNewId = grandPageResp.data.id;
+          progress('pages', `Created chapter: ${grandChild.title}`, currentPageIndex, totalPages);
+        } catch (err) {
+          log(`  ✗ Error creating chapter ${grandChild.title}: ${err.message}`, 'error');
         }
-
-        log(`  ✓ Created page: ${grandChild.title}`, 'success');
-        progress('pages', `Created page: ${grandChild.title}`, currentPageIndex, totalPages);
-      } catch (err: any) {
-        log(`  ✗ Error creating page ${grandChild.title}: ${err.message}`, 'error');
+      } else {
+        // grandChild as page
+        if (await createPage(grandChild, { book_id: bookId }))
+          progress('pages', `Created page: ${grandChild.title}`, currentPageIndex, totalPages);
       }
     }
   }
@@ -483,7 +538,7 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
     log(`✓ Assigned ${bookIds.length} books to shelf`, 'success');
   }
 
-  return { shelves: 1, books: bookCount, pages: pageCount };
+  return getCounters();
 }
 
 // Save attachment records
@@ -589,7 +644,7 @@ export async function runXmlImport(folder: string, reporter?: any): Promise<{ sh
   return {
     shelves: result.shelves,
     books: result.books,
-    chapters: 0,
+    chapters: result.chapters,
     pages: result.pages,
   };
 }
