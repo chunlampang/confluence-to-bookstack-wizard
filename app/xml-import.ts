@@ -482,6 +482,12 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
     }
   }
 
+  // Assign books to shelf
+  if (bookIds.length > 0) {
+    await axios.updateShelf(shelfId, { books: bookIds });
+    log(`✓ Assigned ${bookIds.length} books to shelf`, 'success');
+  }
+
   if (reporter) reporter.complete({ phase: 'books', message: `Created ${bookCount} books`, counters: getCounters() });
 
   // Now create pages for each book
@@ -558,12 +564,6 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   }
 
   if (reporter) reporter.complete({ phase: 'pages', message: `Created ${pageCount} pages`, counters: getCounters() });
-
-  // Assign books to shelf
-  if (bookIds.length > 0) {
-    await axios.updateShelf(shelfId, { books: bookIds });
-    log(`✓ Assigned ${bookIds.length} books to shelf`, 'success');
-  }
 
   return getCounters();
 }
