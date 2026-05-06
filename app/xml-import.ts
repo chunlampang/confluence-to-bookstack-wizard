@@ -236,6 +236,12 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<a href="[ATTACHMENT:${filename}]">${filename}</a>`;
     });
 
+  // Handle code block macro
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\] ><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
+    (match, _, language, code) => {
+      return `<pre><code class="language-${language}">${code}</code></pre>`;
+    });
+
   // Convert structured macros (just remove them for now or convert to divs)
   html = html.replace(/<ac:structured-macro[^>]*>[\s\S]*?<\/ac:structured-macro>/g, '');
 
