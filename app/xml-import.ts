@@ -48,6 +48,7 @@ interface BodyContentData {
   contentId: string;
 }
 
+let spaceTitle: string;
 let pages: Map<string, PageData> = new Map();
 let attachments: Map<string, AttachmentData> = new Map();
 let bodyContents: Map<string, BodyContentData> = new Map();
@@ -56,6 +57,12 @@ let attachmentsByPage: { [key: string]: { attachmentHrefs: { name: string; href:
 // Simple XML parser - extracts objects from Confluence XML export
 function parseEntitiesXml(xmlContent: string) {
   console.log('Parsing entities.xml...');
+
+  const spaceTitleRegex = /<object class="Space" package="com\.atlassian\.confluence\.spaces">[\s\S]*?<property[^>]*><!\[CDATA\[(.*?)\]\]><\/property>/;
+  let spaceTitleMatch = spaceTitleRegex.exec(xmlContent);
+  if (spaceTitleMatch) {
+    spaceTitle = spaceTitleMatch[1]
+  }
 
   // Parse Page objects
   const pageRegex = /<object class="Page" package="com\.atlassian\.confluence\.pages">([\s\S]*?)<\/object>/g;
@@ -348,6 +355,16 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
     }
   };
 
+  // Create shelf
+  if (reporter) reporter.start({ phase: 'shelves', message: 'Creating shelf...' });
+  progress('shelves', `Creating shelf: ${spaceTitle}`, 0, 1);
+  const shelfResp = await axios.createShelf({ name: spaceTitle });
+  const shelfId = shelfResp.data.id;
+  shelfCount++;
+  log(`✓ Created shelf: ${spaceTitle} (ID: ${shelfId})`, 'success');
+  progress('shelves', `Created shelf: ${spaceTitle}`, 1, 1);
+  if (reporter) reporter.complete({ phase: 'shelves', message: `Created shelf: ${spaceTitle}`, counters: getCounters() });
+
   log(`Found ${rootPages.length} root pages`);
 
   // Find the main space page
@@ -355,20 +372,8 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
 
   if (!mainPage) {
     log('No main page found', 'error');
-    return { shelves: 0, books: 0, pages: 0 };
+    return getCounters();
   }
-
-  log(`Main page: ${mainPage.title}`);
-
-  // Create shelf
-  if (reporter) reporter.start({ phase: 'shelves', message: 'Creating shelf...' });
-  progress('shelves', `Creating shelf: ${mainPage.title}`, 0, 1);
-  const shelfResp = await axios.createShelf({ name: mainPage.title });
-  const shelfId = shelfResp.data.id;
-  shelfCount++;
-  log(`✓ Created shelf: ${mainPage.title} (ID: ${shelfId})`, 'success');
-  progress('shelves', `Created shelf: ${mainPage.title}`, 1, 1);
-  if (reporter) reporter.complete({ phase: 'shelves', message: `Created shelf: ${mainPage.title}`, counters: getCounters() });
 
   // Get child pages (these will be books)
   const childPages = [mainPage, ...(hierarchy.get(mainPage.id) || [])];
