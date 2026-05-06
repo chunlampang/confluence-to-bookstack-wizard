@@ -243,6 +243,23 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<a href="[ATTACHMENT:${filename}]">${filename}</a>`;
     });
 
+  // Handle time
+  html = html.replace(/<time datetime="(.*?)" \/>/g,
+    (match, datetime) => {
+      return `<span style="background-color: rgb(206, 212, 217);">${datetime}</span>`;
+    });
+
+  // Handle task list
+  html = html.replace(/<ac:task-list>([\s\S]*?)<\/ac:task-list>/g,
+    (match, list) => {
+      return `<ul style="list-style-type: tasklist;">${list}</ul>`;
+    });
+  html = html.replace(/<ac:task>[\s\S]*?<ac:task-status>(.*?)<\/ac:task-status>[\s\S]*?<ac:task-body>([\s\S]*?)<\/ac:task-body>[\s\S]*?<\/ac:task>/g,
+    (match, status, body) => {
+      let checked = status == 'complete' ? ' checked="checked"' : '';
+      return `<li class="task-list-item"><input${checked} disabled="disabled" type="checkbox">${body}</li>`;
+    });
+
   // Handle code block macro
   html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\]\s?><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
     (match, _, language, code) => {
@@ -250,13 +267,16 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
     });
 
   // Handle status macro
-  html = html.replace(/<ac:structured-macro[^>]*ac:name="status"[^>]*><ac:parameter ac:name="title">(.*?)<\/ac:parameter><ac:parameter ac:name="colour">(.*?)<\/ac:parameter><\/ac:structured-macro>/g,
-    (match, title, color) => {
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="status"[^>]*><ac:parameter ac:name="title">(.*?)<\/ac:parameter>(<ac:parameter ac:name="colour">(.*?)<\/ac:parameter>)?<\/ac:structured-macro>/g,
+    (match, title, _, color) => {
       return `<span style="background-color:${color?.toLowerCase() || 'grey'}">${title}</span>`;
     });
 
   // Convert structured macros (just remove them for now or convert to divs)
-  html = html.replace(/<ac:structured-macro[^>]*>[\s\S]*?<\/ac:structured-macro>/g, '');
+  html = html.replace(/<ac:structured-macro[^>]*>([\s\S]*?)<\/ac:structured-macro>/g,
+    (match, body) => {
+      return `<p>${body}</p>`;
+    });
 
   // Remove other ac: elements
   html = html.replace(/<\/?ac:[^>]+>/g, '');
