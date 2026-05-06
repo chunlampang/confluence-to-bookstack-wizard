@@ -583,7 +583,7 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
 
     try {
       reporter.log('cleanup', 'Fixing attachment links...', 'info');
-      await runFixAttachmentLinks(folder, reporter);
+      await runFixAttachmentLinks(folder, reporter, result.shelfId);
       reporter.log('cleanup', '✓ Attachment links fixed', 'success');
     } catch (err: any) {
       reporter.log('cleanup', `⚠ Attachment link fixing failed: ${err.message}`, 'warning');
@@ -592,7 +592,7 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
 
     try {
       reporter.log('cleanup', 'Removing Confluence thumbnails...', 'info');
-      await runRemoveConfluenceThumbnails(reporter);
+      await runRemoveConfluenceThumbnails(reporter, result.shelfId);
       reporter.log('cleanup', '✓ Confluence thumbnails removed', 'success');
     } catch (err: any) {
       reporter.log('cleanup', `⚠ Thumbnail removal failed: ${err.message}`, 'warning');
@@ -601,7 +601,7 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
 
     try {
       reporter.log('cleanup', 'Removing Confluence placeholders...', 'info');
-      await runRemoveConfluencePlaceholders(reporter);
+      await runRemoveConfluencePlaceholders(reporter, result.shelfId);
       reporter.log('cleanup', '✓ Confluence placeholders removed', 'success');
     } catch (err: any) {
       reporter.log('cleanup', `⚠ Placeholder removal failed: ${err.message}`, 'warning');
@@ -610,7 +610,7 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
 
     try {
       reporter.log('cleanup', 'Fixing embedded images...', 'info');
-      await runFixEmbeddedImages(folder, reporter);
+      await runFixEmbeddedImages(folder, reporter, result.shelfId);
       reporter.log('cleanup', '✓ Embedded images fixed', 'success');
     } catch (err: any) {
       reporter.log('cleanup', `⚠ Embedded image fixing failed: ${err.message}`, 'warning');

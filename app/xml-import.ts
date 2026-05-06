@@ -48,6 +48,7 @@ interface BodyContentData {
   contentId: string;
 }
 
+let shelfId: number;
 let spaceTitle: string;
 let pages: Map<string, PageData> = new Map();
 let attachments: Map<string, AttachmentData> = new Map();
@@ -410,7 +411,7 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   if (reporter) reporter.start({ phase: 'shelves', message: 'Creating shelf...' });
   progress('shelves', `Creating shelf: ${spaceTitle}`, 0, 1);
   const shelfResp = await axios.createShelf({ name: spaceTitle });
-  const shelfId = shelfResp.data.id;
+  shelfId = shelfResp.data.id;
   shelfCount++;
   log(`✓ Created shelf: ${spaceTitle} (ID: ${shelfId})`, 'success');
   progress('shelves', `Created shelf: ${spaceTitle}`, 1, 1);
@@ -624,7 +625,7 @@ if (process.argv[3] === 'xml-import') {
 }
 
 // Exported function for web interface
-export async function runXmlImport(folder: string, reporter?: any): Promise<{ shelves: number; books: number; chapters: number; pages: number }> {
+export async function runXmlImport(folder: string, reporter?: any): Promise<{ shelfId: number; shelves: number; books: number; chapters: number; pages: number }> {
   reloadEnvConfig();
   subDirectory = folder;
 
@@ -668,6 +669,7 @@ export async function runXmlImport(folder: string, reporter?: any): Promise<{ sh
   saveAttachmentRecords();
 
   return {
+    shelfId: shelfId,
     shelves: result.shelves,
     books: result.books,
     chapters: result.chapters,

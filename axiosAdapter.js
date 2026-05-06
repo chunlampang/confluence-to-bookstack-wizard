@@ -1,5 +1,34 @@
 const Axios = require('axios');
 const axiosRetry = require('axios-retry').default;
+const qs = require('qs');
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Rate limiting configuration
+const BASE_DELAY = 300; // Base delay between requests (ms)
+const MAX_RETRIES = 5;
+const BACKOFF_MULTIPLIER = 2;
+
+// Wrapper for API calls with retry logic for 429 errors
+async function withRetry(fn, context = '') {
+  let lastError;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await fn();
+      return result;
+    } catch (err) {
+      lastError = err;
+      if (err.response && err.response.status === 429) {
+        const delay = BASE_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
+        console.log(`\x1b[33m Rate limited${context ? ` (${context})` : ''}, waiting ${delay}ms (attempt ${attempt}/${MAX_RETRIES}) \x1b[0m`);
+        await sleep(delay);
+      } else {
+        throw err; // Re-throw non-429 errors immediately
+      }
+    }
+  }
+  throw lastError; // Throw after all retries exhausted
+}
 
 class AxiosAdapter {
   constructor(baseURL, id, secret) {
@@ -108,7 +137,7 @@ class AxiosAdapter {
     return this.get(`/shelves/${id}`)
   }
 
-  updateShelf = async(id, params) => {
+  updateShelf = async (id, params) => {
     return this.put('/shelves', id, params)
   }
 
@@ -127,7 +156,100 @@ class AxiosAdapter {
   deleteChapter = async (id) => {
     return this.delete('/chapters', id)
   }
-  
+
+  async getAllAttachments() {
+    let allAttachments = [];
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const response = await withRetry(
+        () => this.get('/attachments', { offset, count: limit }),
+        'getAllAttachments'
+      );
+
+      const attachments = response.data.data;
+      allAttachments = allAttachments.concat(attachments);
+
+      if (attachments.length < limit) break;
+      offset += limit;
+      await sleep(BASE_DELAY);
+    }
+
+    console.log(`Found ${allAttachments.length} attachments in BookStack`);
+    return allAttachments;
+  }
+
+  async getAllPagesByShelf(shelfId) {
+    let allPages = [];
+
+    if (shelfId) {
+      // get all pages by shelfId
+      const shelfRes = await this.get(`/shelves/${shelfId}`);
+
+      const promises = await Promise.all(
+        shelfRes.data.books.map(async book => {
+          const response = await this.get('/pages', { filter: { book_id: book.id } });
+          return response.data.data;
+        })
+      );
+
+      for (let pages of promises)
+        allPages = allPages.concat(pages);
+    }
+
+    console.log(`Found ${allPages.length} pages for shelf ${shelfId} in BookStack`);
+    return allPages;
+  }
+
+  async getAllPages() {
+    let allPages = [];
+
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const response = await withRetry(
+        () => this.get('/pages', { offset, count: limit }),
+        'getAllPages'
+      );
+
+      const pages = response.data.data;
+      allPages = allPages.concat(pages);
+
+      if (pages.length < limit) break;
+      offset += limit;
+      await sleep(BASE_DELAY);
+    }
+
+    console.log(`Found ${allPages.length} pages in BookStack`);
+    return allPages;
+  }
+
+  async getPageDetails(pageId) {
+    const response = await withRetry(
+      () => this.get(`/pages/${pageId}`),
+      `getPage:${pageId}`
+    );
+    return response.data;
+  }
+
+  async getPageAttachments(pageId) {
+    const response = await withRetry(
+      () => this.get('/attachments', { filter: { uploaded_to: pageId } }),
+      `getPageAttachments:${pageId}`
+    );
+    const attachments = response.data.data;
+    return attachments;
+  }
+
+  async updatePageHtml(pageId, html, name, bookId) {
+    const response = await withRetry(
+      () => this.put('/pages', pageId, { html, name, book_id: bookId }),
+      `updatePage:${pageId}`
+    );
+    return response.data;
+  }
 }
 
 module.exports = { AxiosAdapter }
