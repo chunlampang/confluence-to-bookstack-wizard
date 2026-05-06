@@ -8,7 +8,13 @@
     "type": "git",
     "url": "https://github.com/transcriptionstream/confluence-to-bookstack-wizard.git"
   },
-  "keywords": ["confluence", "bookstack", "migration", "wiki", "import"],
+  "keywords": [
+    "confluence",
+    "bookstack",
+    "migration",
+    "wiki",
+    "import"
+  ],
   "license": "MIT",
   "scripts": {
     "setup": "npx tsc && node ./dist/setup.js",
@@ -30,6 +36,7 @@
     "form-data": "^4.0.0",
     "glob": "^10.5.0",
     "jsdom": "^24.0.0",
+    "qs": "^6.15.1",
     "slugify": "^1.6.6"
   },
   "devDependencies": {

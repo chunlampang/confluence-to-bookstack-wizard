@@ -1,5 +1,5 @@
 require('dotenv').config();
-const Axios = require('axios');
+const { AxiosAdapter } = require('./axiosAdapter.js');
 const path = require('path');
 
 const credentials = {
@@ -8,13 +8,7 @@ const credentials = {
   secret: process.env.SECRET
 };
 
-const client = Axios.create({
-  baseURL: credentials.url,
-  headers: {
-    'Authorization': `Token ${credentials.id}:${credentials.secret}`,
-    'Content-Type': 'application/json'
-  }
-});
+const axios = new AxiosAdapter(credentials.url, credentials.id, credentials.secret);
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -29,28 +23,6 @@ function loadAttachmentRecords() {
 
 // Rate limiting configuration
 const BASE_DELAY = 300;
-const MAX_RETRIES = 5;
-const BACKOFF_MULTIPLIER = 2;
-
-async function withRetry(fn, context = '') {
-  let lastError;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const result = await fn();
-      return result;
-    } catch (err) {
-      lastError = err;
-      if (err.response && err.response.status === 429) {
-        const delay = BASE_DELAY * Math.pow(BACKOFF_MULTIPLIER, attempt);
-        console.log(`\x1b[33m Rate limited${context ? ` (${context})` : ''}, waiting ${delay}ms (attempt ${attempt}/${MAX_RETRIES}) \x1b[0m`);
-        await sleep(delay);
-      } else {
-        throw err;
-      }
-    }
-  }
-  throw lastError;
-}
 
 function buildPathMapping(subDirectory) {
   const attachmentRecords = loadAttachmentRecords();
@@ -74,68 +46,6 @@ function buildPathMapping(subDirectory) {
 
   console.log(`Built path mapping with ${Object.keys(pathMap).length} entries`);
   return pathMap;
-}
-
-async function getAllAttachments() {
-  let allAttachments = [];
-  let offset = 0;
-  const limit = 100;
-
-  while (true) {
-    const response = await withRetry(
-      () => client.get('/attachments', { params: { offset, count: limit } }),
-      'getAllAttachments'
-    );
-
-    const attachments = response.data.data;
-    allAttachments = allAttachments.concat(attachments);
-
-    if (attachments.length < limit) break;
-    offset += limit;
-    await sleep(BASE_DELAY);
-  }
-
-  console.log(`Found ${allAttachments.length} attachments in BookStack`);
-  return allAttachments;
-}
-
-async function getAllPages() {
-  let allPages = [];
-  let offset = 0;
-  const limit = 100;
-
-  while (true) {
-    const response = await withRetry(
-      () => client.get('/pages', { params: { offset, count: limit } }),
-      'getAllPages'
-    );
-
-    const pages = response.data.data;
-    allPages = allPages.concat(pages);
-
-    if (pages.length < limit) break;
-    offset += limit;
-    await sleep(BASE_DELAY);
-  }
-
-  console.log(`Found ${allPages.length} pages in BookStack`);
-  return allPages;
-}
-
-async function getPageDetails(pageId) {
-  const response = await withRetry(
-    () => client.get(`/pages/${pageId}`),
-    `getPage:${pageId}`
-  );
-  return response.data;
-}
-
-async function updatePageHtml(pageId, html, name, bookId) {
-  const response = await withRetry(
-    () => client.put(`/pages/${pageId}`, { html, name, book_id: bookId }),
-    `updatePage:${pageId}`
-  );
-  return response.data;
 }
 
 function buildAttachmentLookup(attachments) {
@@ -258,10 +168,10 @@ async function main() {
     return;
   }
 
-  const attachments = await getAllAttachments();
+  const attachments = await axios.getAllAttachments();
   const attachmentLookup = buildAttachmentLookup(attachments);
 
-  const pages = await getAllPages();
+  const pages = await axios.getAllPages();
 
   let totalReplacements = 0;
   let pagesUpdated = 0;
@@ -272,7 +182,7 @@ async function main() {
     pagesChecked++;
 
     try {
-      const pageDetails = await getPageDetails(page.id);
+      const pageDetails = await axios.getPageDetails(page.id);
       const html = pageDetails.html || '';
 
       if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
@@ -286,7 +196,7 @@ async function main() {
       allNotFound = allNotFound.concat(notFound);
 
       if (replacements > 0 && updatedHtml !== html) {
-        await updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
         totalReplacements += replacements;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Updated "${page.name}": ${replacements} links fixed \x1b[0m`);
@@ -317,7 +227,7 @@ async function main() {
 }
 
 // Exported function for web interface
-async function runFixAttachmentLinks(subDirectory, reporter) {
+async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
   if (reporter) reporter.start({ phase: 'cleanup:links', message: 'Fixing attachment links...' });
 
   const pathMap = buildPathMapping(subDirectory);
@@ -327,9 +237,7 @@ async function runFixAttachmentLinks(subDirectory, reporter) {
     return { fixed: 0, pages: 0 };
   }
 
-  const attachments = await getAllAttachments();
-  const attachmentLookup = buildAttachmentLookup(attachments);
-  const pages = await getAllPages();
+  const pages = await axios.getAllPagesByShelf(shelfId);
 
   let totalReplacements = 0;
   let pagesUpdated = 0;
@@ -338,17 +246,20 @@ async function runFixAttachmentLinks(subDirectory, reporter) {
     const page = pages[i];
 
     try {
-      const pageDetails = await getPageDetails(page.id);
+      const pageDetails = await axios.getPageDetails(page.id);
       const html = pageDetails.html || '';
 
       if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
         continue;
       }
 
+      const attachments = await axios.getPageAttachments(page.id);
+      const attachmentLookup = buildAttachmentLookup(attachments);
+
       const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
 
       if (replacements > 0 && updatedHtml !== html) {
-        await updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
         totalReplacements += replacements;
         pagesUpdated++;
 
