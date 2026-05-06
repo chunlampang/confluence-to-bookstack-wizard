@@ -220,6 +220,23 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<p>[Image: ${filename}]</p>`;
     });
 
+  // Convert drawio macro: (src -> download link) (preview -> base64 embedded images)
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="drawio"[^>]*>[\s\S]*?<ac:parameter ac:name="diagramName">([\s\S]*?)<\/ac:parameter>[\s\S]*?<\/ac:structured-macro>/g,
+    (match, drawioName) => {
+      let drawioSrc = `[draw.io] <a href="[ATTACHMENT:${drawioName}]">${drawioName}</a>`;
+      let filename = drawioName + '.png';
+
+      const filePath = findAttachmentFile(pageId, filename);
+      if (filePath) {
+        const base64Url = imageToBase64(filePath, filename);
+        if (base64Url) {
+          return `<p>${drawioSrc}<img src="${base64Url}" alt="${filename}" /></p>`;
+        }
+      }
+      // Fallback to placeholder if image not found
+      return `<p>${drawioSrc}</p>`;
+    });
+
   // Convert view-file macro to download link
   html = html.replace(/<ac:structured-macro[^>]*ac:name="view-file"[^>]*>[\s\S]*?<ri:attachment ri:filename="([^"]+)"[^>]*\/>[\s\S]*?<\/ac:structured-macro>/g,
     (match, filename) => {
