@@ -371,7 +371,7 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   if (reporter) reporter.complete({ phase: 'shelves', message: `Created shelf: ${mainPage.title}`, counters: getCounters() });
 
   // Get child pages (these will be books)
-  const childPages = hierarchy.get(mainPage.id) || [];
+  const childPages = [mainPage, ...(hierarchy.get(mainPage.id) || [])];
   log(`Found ${childPages.length} child pages (will be books)`);
 
   const bookIds: number[] = [];
@@ -434,6 +434,8 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   let currentPageIndex = 0;
   for (let i = 0; i < childPages.length; i++) {
     const childPage = childPages[i];
+    if (!childPage.parentId) continue; // main page
+
     const grandChildren = hierarchy.get(childPage.id) || [];
 
     // Find the book ID for this childPage
