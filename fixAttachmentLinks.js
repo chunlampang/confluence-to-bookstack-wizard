@@ -163,10 +163,11 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
 
   // Match placeholder format with various encodings:
   // - Raw: href="[ATTACHMENT:filename]"
-  // - URL-encoded: href="%5BATTACHMENT:filename%5D"
-  // - HTML-encoded: href="&#91;ATTACHMENT:filename&#93;"
-  // - Mixed: href="[ATTACHMENT:filename%5D"
-  const placeholderRegex = /href=["'](?:\[|%5[Bb]|&#91;|&#x5[Bb];)ATTACHMENT:([^\]"']+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)["']/gi;
+  // - URL-encoded: href="%5BATTACHMENT%3Afilename%5D"
+  // - HTML-encoded: href="&#91;ATTACHMENT&#58;filename&#93;"
+  // - Mixed: href="[ATTACHMENT&#58;filename%5D"
+  // - With base URL: href="http://127.0.0.1/%5BATTACHMENT%3Afilename%5D"
+  const placeholderRegex = /href=["'](http[^\]"']+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)ATTACHMENT(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"']+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)["']/gi;
 
   // Fix old-style attachment paths
   updatedHtml = html.replace(attachmentLinkRegex, (match, oldPath) => {
@@ -193,7 +194,7 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
 
   // Fix placeholder-style attachment links
   // First try to match on the CURRENT page, then fall back to global search
-  updatedHtml = updatedHtml.replace(placeholderRegex, (match, filename) => {
+  updatedHtml = updatedHtml.replace(placeholderRegex, (match, baseUrl, filename) => {
     const decodedFilename = decodeURIComponent(filename).trim();
     const filenameLower = decodedFilename.toLowerCase();
 
