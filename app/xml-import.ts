@@ -264,6 +264,11 @@ function buildHierarchy(): Map<string | null, PageData[]> {
     hierarchy.get(parentId)!.push(page);
   }
 
+  // remove unlinked pages
+  let rootPages = hierarchy.get(null) || [];
+  rootPages = rootPages.filter(page => hierarchy.has(page.id));
+  hierarchy.set(null, rootPages);
+
   return hierarchy;
 }
 
@@ -345,11 +350,8 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
 
   log(`Found ${rootPages.length} root pages`);
 
-  // Find the main space page (usually "Human Resources")
-  let mainPage = rootPages.find(p => p.title.toLowerCase().includes('human resources'));
-  if (!mainPage && rootPages.length > 0) {
-    mainPage = rootPages[0];
-  }
+  // Find the main space page
+  let mainPage = rootPages[0];
 
   if (!mainPage) {
     log('No main page found', 'error');
