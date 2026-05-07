@@ -254,6 +254,16 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<span style="background-color:${color?.toLowerCase() || 'grey'}">${title}</span>`;
     });
 
+  // Handle callout macro
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="(?:info|note)"[^>]*>[\s\S]*?<ac:rich-text-body><p>([\s\S]*?)<\/p><\/ac:rich-text-body><\/ac:structured-macro>/g,
+    (match, body) => {
+      return `<p class="callout info">${body}</p>`;
+    });
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="warning"[^>]*>[\s\S]*?<ac:rich-text-body><p>([\s\S]*?)<\/p><\/ac:rich-text-body><\/ac:structured-macro>/g,
+    (match, body) => {
+      return `<p class="callout warning">${body}</p>`;
+    });
+
   // Convert structured macros (just remove them for now or convert to divs)
   html = html.replace(/<ac:structured-macro[^>]*>([\s\S]*?)<\/ac:structured-macro>/g,
     (match, body) => {
