@@ -52,7 +52,7 @@ function buildAttachmentLookup(attachments) {
   const lookup = {};
   for (const att of attachments) {
     const key = `${att.uploaded_to}:${att.name.toLowerCase()}`;
-    lookup[key] = att.id;
+    lookup[key] = att.path || `/attachments/${att.id}`; // path for image; id for attachment
   }
   console.log(`Built attachment lookup with ${Object.keys(lookup).length} entries`);
   // Log a sample of keys for debugging
@@ -72,12 +72,13 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
   const attachmentLinkRegex = /href=["'](attachments\/\d+\/[^"']+)["']/gi;
 
   // Match placeholder format with various encodings:
+  // href for attachment; src for image-gallery
   // - Raw: href="[ATTACHMENT:filename]"
   // - URL-encoded: href="%5BATTACHMENT%3Afilename%5D"
   // - HTML-encoded: href="&#91;ATTACHMENT&#58;filename&#93;"
   // - Mixed: href="[ATTACHMENT&#58;filename%5D"
   // - With base URL: href="http://127.0.0.1/%5BATTACHMENT%3Afilename%5D"
-  const placeholderRegex = /href=["'](http[^\]"']+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)ATTACHMENT(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"']+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)["']/gi;
+  const placeholderRegex = /((?:href|src))=["'](http[^\]"']+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)ATTACHMENT(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"']+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)["']/gi;
 
   // Fix old-style attachment paths
   updatedHtml = html.replace(attachmentLinkRegex, (match, oldPath) => {
@@ -91,7 +92,7 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
 
       if (attachmentId) {
         replacements++;
-        return `href="/attachments/${attachmentId}"`;
+        return `href="${attachmentId}"`;
       } else {
         notFound.push({ path: oldPath, name, pageNewId, reason: 'no attachment found in BookStack' });
       }
@@ -104,9 +105,10 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
 
   // Fix placeholder-style attachment links
   // First try to match on the CURRENT page, then fall back to global search
-  updatedHtml = updatedHtml.replace(placeholderRegex, (match, baseUrl, filename) => {
+  updatedHtml = updatedHtml.replace(placeholderRegex, (match, attrName, baseUrl, filename) => {
     const decodedFilename = decodeURIComponent(filename).trim();
     const filenameLower = decodedFilename.toLowerCase();
+    const output = path => `${attrName}="${path}"`;
 
     console.log(`  [DEBUG] Found placeholder: "${filename}" on page ${currentPageId}`);
 
@@ -117,7 +119,7 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
       if (attachmentLookup[currentPageKey]) {
         console.log(`  [DEBUG] ✓ Found on current page: ${attachmentLookup[currentPageKey]}`);
         replacements++;
-        return `href="/attachments/${attachmentLookup[currentPageKey]}"`;
+        return output(attachmentLookup[currentPageKey]);
       }
     }
 
@@ -128,7 +130,7 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
       if (attName === filenameLower) {
         console.log(`  [DEBUG] ✓ Found on different page via key "${key}": ${attachmentId}`);
         replacements++;
-        return `href="/attachments/${attachmentId}"`;
+        return output(attachmentId);
       }
     }
 
@@ -142,7 +144,7 @@ function fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, currentPageId
         if (decodedAttName === filenameLower || decodedAttName === decodedFilename.toLowerCase()) {
           console.log(`  [DEBUG] ✓ Found via fuzzy match "${key}": ${attachmentId}`);
           replacements++;
-          return `href="/attachments/${attachmentId}"`;
+          return output(attachmentId);
         }
       } catch (e) {
         // Skip invalid URL encoding
@@ -169,7 +171,8 @@ async function main() {
   }
 
   const attachments = await axios.getAllAttachments();
-  const attachmentLookup = buildAttachmentLookup(attachments);
+  const images = await axios.getAllImageGallery();
+  const attachmentLookup = buildAttachmentLookup(attachments.concat(images));
 
   const pages = await axios.getAllPages();
 
@@ -254,7 +257,8 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
       }
 
       const attachments = await axios.getPageAttachments(page.id);
-      const attachmentLookup = buildAttachmentLookup(attachments);
+      const images = await axios.getPageImageGallery(page.id);
+      const attachmentLookup = buildAttachmentLookup(attachments.concat(images));
 
       const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
 

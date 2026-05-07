@@ -53,7 +53,12 @@ let spaceTitle: string;
 let pages: Map<string, PageData> = new Map();
 let attachments: Map<string, AttachmentData> = new Map();
 let bodyContents: Map<string, BodyContentData> = new Map();
-let attachmentsByPage: { [key: string]: { attachmentHrefs: { name: string; href: string }[]; pageNewId?: number } } = {};
+let attachmentsByPage: {
+  [key: string]: {
+    attachmentHrefs: { name: string; href: string, type?: string }[];
+    pageNewId?: number
+  }
+} = {};
 
 // Simple XML parser - extracts objects from Confluence XML export
 function parseEntitiesXml(xmlContent: string) {
@@ -155,27 +160,6 @@ function getPageBody(page: PageData): string {
   return '';
 }
 
-// Find attachment file by filename for a given page
-function findAttachmentFile(pageId: string, filename: string): string | null {
-  const pageAttachmentsDir = path.join(fileDirectory, subDirectory, 'attachments', pageId);
-
-  if (!fs.existsSync(pageAttachmentsDir)) {
-    return null;
-  }
-
-  // Look through attachments for this page
-  for (const [attId, att] of attachments) {
-    if (att.containerId === pageId && att.title === filename) {
-      const filePath = path.join(pageAttachmentsDir, attId, att.version);
-      if (fs.existsSync(filePath)) {
-        return filePath;
-      }
-    }
-  }
-
-  return null;
-}
-
 // Get MIME type from filename
 function getMimeType(filename: string): string {
   const ext = filename.toLowerCase().split('.').pop();
@@ -190,16 +174,11 @@ function getMimeType(filename: string): string {
   return mimeTypes[ext || ''] || 'application/octet-stream';
 }
 
-// Convert image to base64 data URL
-function imageToBase64(filePath: string, filename: string): string | null {
-  try {
-    const data = fs.readFileSync(filePath);
-    const base64 = data.toString('base64');
-    const mimeType = getMimeType(filename);
-    return `data:${mimeType};base64,${base64}`;
-  } catch (err) {
-    return null;
-  }
+async function setAttachmentType(pageId: string, filename: string, type: 'attachment' | 'gallery' | 'drawio') {
+  const { attachmentHrefs } = attachmentsByPage[pageId];
+  const index = attachmentHrefs.findIndex(attach => attach.name === filename);
+  if (index !== -1)
+    attachmentHrefs[index].type = type;
 }
 
 // Convert Confluence storage format to HTML
@@ -209,15 +188,8 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
   // Convert ac:image to img tags with base64 embedded images
   html = html.replace(/<ac:image[^>]*>[\s\S]*?<ri:attachment ri:filename="([^"]+)"[^>]*\/>[\s\S]*?<\/ac:image>/g,
     (match, filename) => {
-      const filePath = findAttachmentFile(pageId, filename);
-      if (filePath) {
-        const base64Url = imageToBase64(filePath, filename);
-        if (base64Url) {
-          return `<img src="${base64Url}" alt="${filename}" />`;
-        }
-      }
-      // Fallback to placeholder if image not found
-      return `<p>[Image: ${filename}]</p>`;
+      setAttachmentType(pageId, filename, 'gallery');
+      return `<img src="[ATTACHMENT:${filename}]" alt="${filename}" />`;
     });
 
   // Convert drawio macro: (src -> download link) (preview -> base64 embedded images)
@@ -225,16 +197,8 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
     (match, drawioName) => {
       let drawioSrc = `[draw.io] <a href="[ATTACHMENT:${drawioName}]">${drawioName}</a>`;
       let filename = drawioName + '.png';
-
-      const filePath = findAttachmentFile(pageId, filename);
-      if (filePath) {
-        const base64Url = imageToBase64(filePath, filename);
-        if (base64Url) {
-          return `<p>${drawioSrc}<img src="${base64Url}" alt="${filename}" /></p>`;
-        }
-      }
-      // Fallback to placeholder if image not found
-      return `<p>${drawioSrc}</p>`;
+      setAttachmentType(pageId, filename, 'drawio');
+      return `<p>${drawioSrc}<img src="[ATTACHMENT:${filename}]" alt="${filename}" /></p>`;
     });
 
   // Convert view-file macro to download link

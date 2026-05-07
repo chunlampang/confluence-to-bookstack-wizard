@@ -117,6 +117,10 @@ class AxiosAdapter {
     return this.postMFD('/attachments', body)
   }
 
+  createImageGallery = async (body) => {
+    return this.postMFD('/image-gallery', body)
+  }
+
   getBooks = async () => {
     return this.get('/books')
   }
@@ -180,6 +184,29 @@ class AxiosAdapter {
     return allAttachments;
   }
 
+  async getAllImageGallery() {
+    let allImages = [];
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const response = await withRetry(
+        () => this.get('/image-gallery', { offset, count: limit }),
+        'getAllImageGallery'
+      );
+
+      const images = response.data.data;
+      allImages = allImages.concat(images);
+
+      if (images.length < limit) break;
+      offset += limit;
+      await sleep(BASE_DELAY);
+    }
+
+    console.log(`Found ${allImages.length} images in BookStack`);
+    return allImages;
+  }
+
   async getAllPagesByShelf(shelfId) {
     let allPages = [];
 
@@ -239,8 +266,15 @@ class AxiosAdapter {
       () => this.get('/attachments', { filter: { uploaded_to: pageId } }),
       `getPageAttachments:${pageId}`
     );
-    const attachments = response.data.data;
-    return attachments;
+    return response.data.data;
+  }
+
+  async getPageImageGallery(pageId) {
+    const response = await withRetry(
+      () => this.get('/image-gallery', { filter: { uploaded_to: pageId } }),
+      `getPageImageGallery:${pageId}`
+    );
+    return response.data.data;
   }
 
   async updatePageHtml(pageId, html, name, bookId) {
