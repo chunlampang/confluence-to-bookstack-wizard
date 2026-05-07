@@ -250,6 +250,21 @@ class AxiosAdapter {
     );
     return response.data;
   }
+
+  async clearRecycleBin() {
+    console.log('clearing recycle bin');
+    let bins;
+    let deleted = 0;
+    do {
+      let res = await this.get('/recycle-bin', { count: 50 });
+      bins = res.data.data;
+      await Promise.all(bins.map(async bin => {
+        let res = await this.delete('/recycle-bin', bin.id);
+        deleted += res.data.delete_count;
+      }))
+    } while (bins.length);
+    console.log(`cleared recycle bin: ${deleted}`);
+  }
 }
 
 module.exports = { AxiosAdapter }
