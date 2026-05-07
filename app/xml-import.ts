@@ -527,10 +527,10 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
           log(`  ✓ Created chapter: ${grandChild.title}`, 'success');
 
           const params = { chapter_id: chapterResp.data.id };
-          await createPage(grandChild, params); // Create general page for chapter
-          for (let subpage of subpages) { // Create subpage for chapter
-            await createPage(subpage, params);
-          }
+          await Promise.all([
+            createPage(grandChild, params), // Create general page for chapter
+            ...subpages.map(subpage => createPage(subpage, params)) // Create subpage for chapter
+          ])
 
           progress('pages', `Created chapter: ${grandChild.title}`, currentPageIndex, totalPages);
         } catch (err) {

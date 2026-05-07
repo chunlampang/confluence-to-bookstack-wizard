@@ -227,8 +227,6 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
           });
         }
       }
-
-      await sleep(BASE_DELAY);
     } catch (err) {
       if (reporter) reporter.warning({ phase: 'cleanup:images', message: `Error on "${page.name}": ${err.message}` });
     }

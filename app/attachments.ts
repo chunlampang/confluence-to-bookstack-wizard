@@ -236,8 +236,6 @@ export async function runAttachments(folder: string, reporter?: any): Promise<{ 
           total: uploadParamCollection.length
         });
       }
-
-      await sleep(100);
     } catch (err: any) {
       errorCount++;
       const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';

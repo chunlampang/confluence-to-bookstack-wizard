@@ -256,8 +256,13 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
         continue;
       }
 
-      const attachments = await axios.getPageAttachments(page.id);
-      const images = await axios.getPageImageGallery(page.id);
+      const [
+        attachments,
+        images,
+      ] = await Promise.all([
+        axios.getPageAttachments(page.id),
+        axios.getPageImageGallery(page.id),
+      ]);
       const attachmentLookup = buildAttachmentLookup(attachments.concat(images));
 
       const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
@@ -276,8 +281,6 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
           });
         }
       }
-
-      await sleep(BASE_DELAY);
     } catch (err) {
       if (reporter) reporter.warning({ phase: 'cleanup:links', message: `Error on "${page.name}": ${err.message}` });
     }
