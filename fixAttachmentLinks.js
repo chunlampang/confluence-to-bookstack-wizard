@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { AxiosAdapter } = require('./axiosAdapter.js');
 const path = require('path');
+const { default: pLimit } = require('p-limit');
 
 const credentials = {
   url: process.env.URL,
@@ -245,46 +246,50 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
   let totalReplacements = 0;
   let pagesUpdated = 0;
 
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
+  const limit = pLimit(5);
 
-    try {
-      const pageDetails = await axios.getPageDetails(page.id);
-      const html = pageDetails.html || '';
+  await Promise.all(
+    pages.map((page, i) =>
+      limit(async () => {
+        try {
+          const pageDetails = await axios.getPageDetails(page.id);
+          const html = pageDetails.html || '';
 
-      if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
-        continue;
-      }
+          if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
+            return;
+          }
 
-      const [
-        attachments,
-        images,
-      ] = await Promise.all([
-        axios.getPageAttachments(page.id),
-        axios.getPageImageGallery(page.id),
-      ]);
-      const attachmentLookup = buildAttachmentLookup(attachments.concat(images));
+          const [
+            attachments,
+            images,
+          ] = await Promise.all([
+            axios.getPageAttachments(page.id),
+            axios.getPageImageGallery(page.id),
+          ]);
+          const attachmentLookup = buildAttachmentLookup(attachments.concat(images));
 
-      const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
+          const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
 
-      if (replacements > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
-        totalReplacements += replacements;
-        pagesUpdated++;
+          if (replacements > 0 && updatedHtml !== html) {
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+            totalReplacements += replacements;
+            pagesUpdated++;
 
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:links',
-            message: `Fixed ${replacements} links in "${page.name}"`,
-            current: i + 1,
-            total: pages.length
-          });
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:links',
+                message: `Fixed ${replacements} links in "${page.name}"`,
+                current: i + 1,
+                total: pages.length
+              });
+            }
+          }
+        } catch (err) {
+          if (reporter) reporter.warning({ phase: 'cleanup:links', message: `Error on "${page.name}": ${err.message}` });
         }
-      }
-    } catch (err) {
-      if (reporter) reporter.warning({ phase: 'cleanup:links', message: `Error on "${page.name}": ${err.message}` });
-    }
-  }
+      })
+    )
+  );
 
   if (reporter) {
     reporter.complete({

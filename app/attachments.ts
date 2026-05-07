@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
+const { default: pLimit } = require('p-limit');
 const { AxiosAdapter } = require('../axiosAdapter.js');
 
 let fileDirectory = process.env.PATH_TO_HTML
@@ -190,61 +191,65 @@ export async function runAttachments(folder: string, reporter?: any): Promise<{ 
   let successCount = 0;
   let errorCount = 0;
 
-  for (let i = 0; i < uploadParamCollection.length; i++) {
-    const params = uploadParamCollection[i];
+  const limit = pLimit(5);
 
-    if (reporter) {
-      reporter.log('attachments', `Uploading ${i + 1}/${uploadParamCollection.length}: ${params.name}`, 'info');
-    }
-
-    try {
-      switch (params.type) {
-        case 'drawio':
-        case 'gallery':
-          try {
-            const form = new FormData();
-            form.append('type', params.type);
-            form.append('uploaded_to', params.uploaded_to);
-            form.append('name', params.name);
-            form.append('image', fs.createReadStream(params.filePath), params.name);
-            await axios.createImageGallery(form);
-            break;
-          } catch (err) {
-            if (reporter) {
-              const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';
-              reporter.log('attachments', `✗ Failed: Upload to gallery ${params.name} - ${errMsg}`, 'warning');
-              reporter.log('attachments', `Fallback upload to attachment ${params.name}`, 'info');
-            }
-            // no break for fallback
-          }
-        default: {
-          const form = new FormData();
-          form.append('uploaded_to', params.uploaded_to);
-          form.append('name', params.name);
-          form.append('file', fs.createReadStream(params.filePath), params.name);
-          await axios.createAttachment(form);
+  await Promise.all(
+    uploadParamCollection.map((params, i) => limit(
+      async () => {
+        if (reporter) {
+          reporter.log('attachments', `Uploading ${i + 1}/${uploadParamCollection.length}: ${params.name}`, 'info');
         }
-      }
-      successCount++;
 
-      if (reporter) {
-        reporter.log('attachments', `✓ Uploaded: ${params.name}`, 'success');
-        reporter.progress({
-          phase: 'attachments',
-          message: `Uploaded ${successCount} of ${uploadParamCollection.length} attachments`,
-          current: i + 1,
-          total: uploadParamCollection.length
-        });
-      }
-    } catch (err: any) {
-      errorCount++;
-      const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';
-      if (reporter) {
-        reporter.log('attachments', `✗ Failed: ${params.name} - ${errMsg}`, 'error');
-      }
-      notAttached.push({ name: params.name, error: errMsg });
-    }
-  }
+        try {
+          switch (params.type) {
+            case 'drawio':
+            case 'gallery':
+              try {
+                const form = new FormData();
+                form.append('type', params.type);
+                form.append('uploaded_to', params.uploaded_to);
+                form.append('name', params.name);
+                form.append('image', fs.createReadStream(params.filePath), params.name);
+                await axios.createImageGallery(form);
+                break;
+              } catch (err) {
+                if (reporter) {
+                  const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';
+                  reporter.log('attachments', `✗ Failed: Upload to gallery ${params.name} - ${errMsg}`, 'warning');
+                  reporter.log('attachments', `Fallback upload to attachment ${params.name}`, 'info');
+                }
+                // no break for fallback
+              }
+            default: {
+              const form = new FormData();
+              form.append('uploaded_to', params.uploaded_to);
+              form.append('name', params.name);
+              form.append('file', fs.createReadStream(params.filePath), params.name);
+              await axios.createAttachment(form);
+            }
+          }
+          successCount++;
+
+          if (reporter) {
+            reporter.log('attachments', `✓ Uploaded: ${params.name}`, 'success');
+            reporter.progress({
+              phase: 'attachments',
+              message: `Uploaded ${successCount} of ${uploadParamCollection.length} attachments`,
+              current: successCount,
+              total: uploadParamCollection.length
+            });
+          }
+        } catch (err: any) {
+          errorCount++;
+          const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';
+          if (reporter) {
+            reporter.log('attachments', `✗ Failed: ${params.name} - ${errMsg}`, 'error');
+          }
+          notAttached.push({ name: params.name, error: errMsg });
+        }
+      })
+    )
+  );
 
   if (reporter) {
     reporter.complete({

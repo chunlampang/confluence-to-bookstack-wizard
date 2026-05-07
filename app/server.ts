@@ -574,7 +574,6 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
 
     // Run cleanup scripts
     const { runFixAttachmentLinks } = require('../fixAttachmentLinks.js');
-    const { runFixEmbeddedImages } = require('../fixEmbeddedImages.js');
     const { runRemoveConfluencePlaceholders } = require('../removeConfluencePlaceholders.js');
     const { runRemoveConfluenceThumbnails } = require('../removeConfluenceThumbnails.js');
 
@@ -606,15 +605,6 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
     } catch (err: any) {
       reporter.log('cleanup', `⚠ Placeholder removal failed: ${err.message}`, 'warning');
       console.error('Placeholder removal error:', err);
-    }
-
-    try {
-      reporter.log('cleanup', 'Fixing embedded images...', 'info');
-      await runFixEmbeddedImages(folder, reporter, result.shelfId);
-      reporter.log('cleanup', '✓ Embedded images fixed', 'success');
-    } catch (err: any) {
-      reporter.log('cleanup', `⚠ Embedded image fixing failed: ${err.message}`, 'warning');
-      console.error('Embedded image fix error:', err);
     }
 
     // Clear all attachment records now that import is complete

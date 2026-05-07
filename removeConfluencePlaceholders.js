@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { default: pLimit } = require('p-limit');
 const { AxiosAdapter } = require('./axiosAdapter.js');
 
 const credentials = {
@@ -107,37 +108,41 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
   let totalRemovals = 0;
   let pagesUpdated = 0;
 
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
+  const limit = pLimit(5);
 
-    try {
-      const pageDetails = await axios.getPageDetails(page.id);
-      const html = pageDetails.html || '';
+  await Promise.all(
+    pages.map((page, i) =>
+      limit(async () => {
+        try {
+          const pageDetails = await axios.getPageDetails(page.id);
+          const html = pageDetails.html || '';
 
-      if (!html.includes('download/resources/') && !html.includes('download/thumbnails/')) {
-        continue;
-      }
+          if (!html.includes('download/resources/') && !html.includes('download/thumbnails/')) {
+            return;
+          }
 
-      const { updatedHtml, removals } = removePlaceholders(html);
+          const { updatedHtml, removals } = removePlaceholders(html);
 
-      if (removals > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
-        totalRemovals += removals;
-        pagesUpdated++;
+          if (removals > 0 && updatedHtml !== html) {
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+            totalRemovals += removals;
+            pagesUpdated++;
 
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:placeholders',
-            message: `Cleaned "${page.name}": ${removals} placeholders removed`,
-            current: i + 1,
-            total: pages.length
-          });
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:placeholders',
+                message: `Cleaned "${page.name}": ${removals} placeholders removed`,
+                current: i + 1,
+                total: pages.length
+              });
+            }
+          }
+        } catch (err) {
+          if (reporter) reporter.warning({ phase: 'cleanup:placeholders', message: `Error on "${page.name}": ${err.message}` });
         }
-      }
-    } catch (err) {
-      if (reporter) reporter.warning({ phase: 'cleanup:placeholders', message: `Error on "${page.name}": ${err.message}` });
-    }
-  }
+      })
+    )
+  );
 
   if (reporter) reporter.complete({ phase: 'cleanup:placeholders', message: `Removed ${totalRemovals} placeholders from ${pagesUpdated} pages` });
   return { removed: totalRemovals, pages: pagesUpdated };
