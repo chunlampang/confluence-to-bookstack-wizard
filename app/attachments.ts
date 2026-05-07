@@ -212,7 +212,7 @@ export async function runAttachments(folder: string, reporter?: any): Promise<{ 
           } catch (err) {
             if (reporter) {
               const errMsg = err.response?.data?.error?.message || err.message || 'Unknown error';
-              reporter.log('attachments', `✗ Failed: Upload to gallery ${params.name} - ${errMsg}`, 'error');
+              reporter.log('attachments', `✗ Failed: Upload to gallery ${params.name} - ${errMsg}`, 'warning');
               reporter.log('attachments', `Fallback upload to attachment ${params.name}`, 'info');
             }
             // no break for fallback
