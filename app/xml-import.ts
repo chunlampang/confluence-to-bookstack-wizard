@@ -243,7 +243,7 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
     });
 
   // Handle code block macro
-  html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\]\s?><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\s*\]\s*><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
     (match, _, language, code) => {
       return `<pre><code class="language-${language || ''}">${code}</code></pre>`;
     });
