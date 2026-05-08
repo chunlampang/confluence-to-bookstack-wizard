@@ -160,6 +160,14 @@ function getPageBody(page: PageData): string {
   return '';
 }
 
+function encodeHtml(str: string) {
+  return str && str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // Get MIME type from filename
 function getMimeType(filename: string): string {
   const ext = filename.toLowerCase().split('.').pop();
@@ -245,7 +253,7 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
   // Handle code block macro
   html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\s*\]\s*><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
     (match, _, language, code) => {
-      return `<pre><code class="language-${language || ''}">${code}</code></pre>`;
+      return `<pre><code class="language-${language || ''}">${encodeHtml(code)}</code></pre>`;
     });
 
   // Handle status macro
