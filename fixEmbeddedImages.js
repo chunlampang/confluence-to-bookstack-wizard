@@ -205,6 +205,14 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
       const html = pageDetails.html || '';
 
       if (!html.includes('src="attachments/') && !html.includes("src='attachments/")) {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:images',
+            message: `Skipped "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
         continue;
       }
 
@@ -222,6 +230,15 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
           reporter.progress({
             phase: 'cleanup:images',
             message: `Fixed ${replacements} images in "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
+      } else {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:images',
+            message: `Cannot fix "${page.name}"`,
             current: i + 1,
             total: pages.length
           });

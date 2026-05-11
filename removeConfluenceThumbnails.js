@@ -86,10 +86,10 @@ async function main() {
 
       // Check if page has potential Confluence artifacts
       if (!html.includes('rest/documentConversion') &&
-          !html.includes('emoticon') &&
-          !html.includes('images/icons/') &&
-          !html.includes('status-macro') &&
-          !html.includes('confluence-embedded-file')) {
+        !html.includes('emoticon') &&
+        !html.includes('images/icons/') &&
+        !html.includes('status-macro') &&
+        !html.includes('confluence-embedded-file')) {
         if (pagesChecked % 50 === 0) {
           console.log(`[${pagesChecked}/${pages.length}] Checking...`);
         }
@@ -144,10 +144,18 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
       const html = pageDetails.html || '';
 
       if (!html.includes('rest/documentConversion') &&
-          !html.includes('emoticon') &&
-          !html.includes('images/icons/') &&
-          !html.includes('status-macro') &&
-          !html.includes('confluence-embedded-file')) {
+        !html.includes('emoticon') &&
+        !html.includes('images/icons/') &&
+        !html.includes('status-macro') &&
+        !html.includes('confluence-embedded-file')) {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:thumbnails',
+            message: `Skipped "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
         continue;
       }
 
@@ -162,6 +170,15 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
           reporter.progress({
             phase: 'cleanup:thumbnails',
             message: `Cleaned "${page.name}": ${removals} items removed`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
+      } else {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:thumbnails',
+            message: `Cannot fix "${page.name}"`,
             current: i + 1,
             total: pages.length
           });

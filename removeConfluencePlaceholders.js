@@ -115,6 +115,14 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
       const html = pageDetails.html || '';
 
       if (!html.includes('download/resources/') && !html.includes('download/thumbnails/')) {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:placeholders',
+            message: `Skipped "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
         continue;
       }
 
@@ -129,6 +137,15 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
           reporter.progress({
             phase: 'cleanup:placeholders',
             message: `Cleaned "${page.name}": ${removals} placeholders removed`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
+      } else {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:placeholders',
+            message: `Cannot fix "${page.name}"`,
             current: i + 1,
             total: pages.length
           });

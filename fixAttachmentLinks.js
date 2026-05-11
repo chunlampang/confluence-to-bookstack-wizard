@@ -253,6 +253,14 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
       const html = pageDetails.html || '';
 
       if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:links',
+            message: `Skipped "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
         continue;
       }
 
@@ -271,6 +279,15 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
           reporter.progress({
             phase: 'cleanup:links',
             message: `Fixed ${replacements} links in "${page.name}"`,
+            current: i + 1,
+            total: pages.length
+          });
+        }
+      } else {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:links',
+            message: `Cannot fix "${page.name}"`,
             current: i + 1,
             total: pages.length
           });
