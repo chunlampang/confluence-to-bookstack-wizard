@@ -277,9 +277,9 @@ class AxiosAdapter {
     return response.data.data;
   }
 
-  async updatePageHtml(pageId, html, name, bookId) {
+  async updatePageHtml(pageId, html, name) {
     const response = await withRetry(
-      () => this.put('/pages', pageId, { html, name, book_id: bookId }),
+      () => this.put('/pages', pageId, { html, name }),
       `updatePage:${pageId}`
     );
     return response.data;

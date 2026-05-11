@@ -99,7 +99,7 @@ async function main() {
       const { updatedHtml, removals } = removeConfluenceThumbnails(html);
 
       if (removals > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalRemovals += removals;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Cleaned "${page.name}": ${removals} items removed \x1b[0m`);
@@ -154,7 +154,7 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
       const { updatedHtml, removals } = removeConfluenceThumbnails(html);
 
       if (removals > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalRemovals += removals;
         pagesUpdated++;
 

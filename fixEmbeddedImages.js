@@ -142,7 +142,7 @@ async function main() {
 
       if (updatedHtml !== html) {
         // Update the page
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalReplacements += replacements;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Updated "${page.name}": ${replacements} images fixed \x1b[0m`);
@@ -214,7 +214,7 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
       const { updatedHtml, replacements } = fixEmbeddedImagesInHtml(html, pathMap, attachmentLookup);
 
       if (updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalReplacements += replacements;
         pagesUpdated++;
 
