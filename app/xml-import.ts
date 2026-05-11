@@ -160,6 +160,14 @@ function getPageBody(page: PageData): string {
   return '';
 }
 
+function encodeHtml(str: string) {
+  return str && str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // Get MIME type from filename
 function getMimeType(filename: string): string {
   const ext = filename.toLowerCase().split('.').pop();
@@ -243,15 +251,25 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
     });
 
   // Handle code block macro
-  html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\]\s?><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="code"[^>]*>[\s\S]*?(<ac:parameter ac:name="language">(.*)<\/ac:parameter>)?[\s\S]*?<ac:plain-text-body><!\[CDATA\[([\s\S]*?)\]\s*\]\s*><\/ac:plain-text-body>[\s\S]*?<\/ac:structured-macro>/g,
     (match, _, language, code) => {
-      return `<pre><code class="language-${language || ''}">${code}</code></pre>`;
+      return `<pre><code class="language-${language || ''}">${encodeHtml(code)}</code></pre>`;
     });
 
   // Handle status macro
   html = html.replace(/<ac:structured-macro[^>]*ac:name="status"[^>]*><ac:parameter ac:name="title">(.*?)<\/ac:parameter>(<ac:parameter ac:name="colour">(.*?)<\/ac:parameter>)?<\/ac:structured-macro>/g,
     (match, title, _, color) => {
       return `<span style="background-color:${color?.toLowerCase() || 'grey'}">${title}</span>`;
+    });
+
+  // Handle callout macro
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="(?:info|note)"[^>]*>[\s\S]*?<ac:rich-text-body><p>([\s\S]*?)<\/p><\/ac:rich-text-body><\/ac:structured-macro>/g,
+    (match, body) => {
+      return `<p class="callout info">${body}</p>`;
+    });
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="warning"[^>]*>[\s\S]*?<ac:rich-text-body><p>([\s\S]*?)<\/p><\/ac:rich-text-body><\/ac:structured-macro>/g,
+    (match, body) => {
+      return `<p class="callout warning">${body}</p>`;
     });
 
   // Convert structured macros (just remove them for now or convert to divs)

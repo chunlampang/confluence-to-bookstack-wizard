@@ -71,7 +71,7 @@ async function main() {
       const { updatedHtml, removals } = removePlaceholders(html);
 
       if (removals > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalRemovals += removals;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Cleaned "${page.name}": ${removals} placeholders removed \x1b[0m`);
@@ -107,6 +107,7 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
 
   let totalRemovals = 0;
   let pagesUpdated = 0;
+  let progress = 0;
 
   const limit = pLimit(5);
 
@@ -118,13 +119,21 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
           const html = pageDetails.html || '';
 
           if (!html.includes('download/resources/') && !html.includes('download/thumbnails/')) {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:placeholders',
+                message: `Skipped "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
             return;
           }
 
           const { updatedHtml, removals } = removePlaceholders(html);
 
           if (removals > 0 && updatedHtml !== html) {
-            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
             totalRemovals += removals;
             pagesUpdated++;
 
@@ -132,7 +141,16 @@ async function runRemoveConfluencePlaceholders(reporter, shelfId) {
               reporter.progress({
                 phase: 'cleanup:placeholders',
                 message: `Cleaned "${page.name}": ${removals} placeholders removed`,
-                current: i + 1,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          } else {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:placeholders',
+                message: `Cannot fix "${page.name}"`,
+                current: ++progress,
                 total: pages.length
               });
             }

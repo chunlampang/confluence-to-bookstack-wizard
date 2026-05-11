@@ -100,7 +100,7 @@ async function main() {
       const { updatedHtml, removals } = removeConfluenceThumbnails(html);
 
       if (removals > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalRemovals += removals;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Cleaned "${page.name}": ${removals} items removed \x1b[0m`);
@@ -136,6 +136,7 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
 
   let totalRemovals = 0;
   let pagesUpdated = 0;
+  let progress = 0;
 
   const limit = pLimit(5);
 
@@ -151,13 +152,21 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
             !html.includes('images/icons/') &&
             !html.includes('status-macro') &&
             !html.includes('confluence-embedded-file')) {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:thumbnails',
+                message: `Skipped "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
             return;
           }
 
           const { updatedHtml, removals } = removeConfluenceThumbnails(html);
 
           if (removals > 0 && updatedHtml !== html) {
-            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
             totalRemovals += removals;
             pagesUpdated++;
 
@@ -165,7 +174,16 @@ async function runRemoveConfluenceThumbnails(reporter, shelfId) {
               reporter.progress({
                 phase: 'cleanup:thumbnails',
                 message: `Cleaned "${page.name}": ${removals} items removed`,
-                current: i + 1,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          } else {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:thumbnails',
+                message: `Cannot fix "${page.name}"`,
+                current: ++progress,
                 total: pages.length
               });
             }

@@ -200,7 +200,7 @@ async function main() {
       allNotFound = allNotFound.concat(notFound);
 
       if (replacements > 0 && updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalReplacements += replacements;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Updated "${page.name}": ${replacements} links fixed \x1b[0m`);
@@ -245,6 +245,7 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
 
   let totalReplacements = 0;
   let pagesUpdated = 0;
+  let progress = 0;
 
   const limit = pLimit(5);
 
@@ -256,6 +257,14 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
           const html = pageDetails.html || '';
 
           if (!html.includes('attachments/') && !html.includes('ATTACHMENT:') && !html.includes('%5BATTACHMENT') && !html.includes('&#91;ATTACHMENT')) {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:links',
+                message: `Skipped "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
             return;
           }
 
@@ -271,7 +280,7 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
           const { updatedHtml, replacements } = fixAttachmentLinksInHtml(html, pathMap, attachmentLookup, page.id);
 
           if (replacements > 0 && updatedHtml !== html) {
-            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
             totalReplacements += replacements;
             pagesUpdated++;
 
@@ -279,7 +288,16 @@ async function runFixAttachmentLinks(subDirectory, reporter, shelfId) {
               reporter.progress({
                 phase: 'cleanup:links',
                 message: `Fixed ${replacements} links in "${page.name}"`,
-                current: i + 1,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          } else {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:links',
+                message: `Cannot fix "${page.name}"`,
+                current: ++progress,
                 total: pages.length
               });
             }

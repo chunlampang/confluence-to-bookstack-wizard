@@ -142,7 +142,7 @@ async function main() {
 
       if (updatedHtml !== html) {
         // Update the page
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalReplacements += replacements;
         pagesUpdated++;
         console.log(`\x1b[32m [${pagesChecked}/${pages.length}] Updated "${page.name}": ${replacements} images fixed \x1b[0m`);
@@ -196,6 +196,7 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
 
   let totalReplacements = 0;
   let pagesUpdated = 0;
+  let progress = 0;
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
@@ -205,6 +206,14 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
       const html = pageDetails.html || '';
 
       if (!html.includes('src="attachments/') && !html.includes("src='attachments/")) {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:images',
+            message: `Skipped "${page.name}"`,
+            current: ++progress,
+            total: pages.length
+          });
+        }
         continue;
       }
 
@@ -214,7 +223,7 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
       const { updatedHtml, replacements } = fixEmbeddedImagesInHtml(html, pathMap, attachmentLookup);
 
       if (updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name, pageDetails.book_id);
+        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
         totalReplacements += replacements;
         pagesUpdated++;
 
@@ -222,7 +231,16 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
           reporter.progress({
             phase: 'cleanup:images',
             message: `Fixed ${replacements} images in "${page.name}"`,
-            current: i + 1,
+            current: ++progress,
+            total: pages.length
+          });
+        }
+      } else {
+        if (reporter) {
+          reporter.progress({
+            phase: 'cleanup:images',
+            message: `Cannot fix "${page.name}"`,
+            current: ++progress,
             total: pages.length
           });
         }
