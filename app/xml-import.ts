@@ -517,50 +517,56 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
     }
   }
 
+  const limit = pLimit(5);
+
   let currentPageIndex = 0;
-  for (let i = 0; i < childPages.length; i++) {
-    const childPage = childPages[i];
-    if (!childPage.parentId) continue; // main page
 
-    const grandChildren = hierarchy.get(childPage.id) || [];
+  await Promise.all( // async by book
+    childPages.map((childPage, i) =>
+      limit(async () => {
+        if (!childPage.parentId) return; // main page
 
-    // Find the book ID for this childPage
-    const bookId = bookIds[i];
-    if (!bookId) continue;
+        const grandChildren = hierarchy.get(childPage.id) || [];
 
-    for (let j = 0; j < grandChildren.length; j++) {
-      const grandChild = grandChildren[j];
-      currentPageIndex++;
-      progress('pages', `Creating page ${currentPageIndex}/${totalPages}: ${grandChild.title}`, currentPageIndex, totalPages);
+        // Find the book ID for this childPage
+        const bookId = bookIds[i];
+        if (!bookId) return;
 
-      const subpages = hierarchy.get(grandChild.id) || [];
-      if (subpages.length) {
-        // grandChild as chapter
-        try {
-          const chapterResp = await axios.createChapter({
-            name: grandChild.title,
-            book_id: bookId
-          });
-          chapterCount++;
-          log(`  ✓ Created chapter: ${grandChild.title}`, 'success');
+        for (let j = 0; j < grandChildren.length; j++) {
+          const grandChild = grandChildren[j];
+          currentPageIndex++;
+          progress('pages', `Creating page ${currentPageIndex}/${totalPages}: ${grandChild.title}`, currentPageIndex, totalPages);
 
-          const params = { chapter_id: chapterResp.data.id };
-          await createPage(grandChild, params); // Create general page for chapter
-          for (let subpage of subpages) { // Create subpage for chapter
-            await createPage(subpage, params);
+          const subpages = hierarchy.get(grandChild.id) || [];
+          if (subpages.length) {
+            // grandChild as chapter
+            try {
+              const chapterResp = await axios.createChapter({
+                name: grandChild.title,
+                book_id: bookId
+              });
+              chapterCount++;
+              log(`  ✓ Created chapter: ${grandChild.title}`, 'success');
+
+              const params = { chapter_id: chapterResp.data.id };
+              await createPage(grandChild, params); // Create general page for chapter
+              for (let subpage of subpages) { // Create subpage for chapter
+                await createPage(subpage, params);
+              }
+
+              progress('pages', `Created chapter: ${grandChild.title}`, currentPageIndex, totalPages);
+            } catch (err) {
+              log(`  ✗ Error creating chapter ${grandChild.title}: ${err.message}`, 'error');
+            }
+          } else {
+            // grandChild as page
+            if (await createPage(grandChild, { book_id: bookId }))
+              progress('pages', `Created page: ${grandChild.title}`, currentPageIndex, totalPages);
           }
-
-          progress('pages', `Created chapter: ${grandChild.title}`, currentPageIndex, totalPages);
-        } catch (err) {
-          log(`  ✗ Error creating chapter ${grandChild.title}: ${err.message}`, 'error');
         }
-      } else {
-        // grandChild as page
-        if (await createPage(grandChild, { book_id: bookId }))
-          progress('pages', `Created page: ${grandChild.title}`, currentPageIndex, totalPages);
-      }
-    }
-  }
+      })
+    )
+  );
 
   if (reporter) reporter.complete({ phase: 'pages', message: `Created ${pageCount} pages`, counters: getCounters() });
 
