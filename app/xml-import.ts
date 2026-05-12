@@ -247,6 +247,12 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<a href="[PAGE:${pageSpace}:${pageTitle}]">${title}</a>`;
     });
 
+  // user (mapping later)
+  html = html.replace(/<ac:link[^>]*>[\s\S]*?<ri:user ri:userkey="([^"]+?)"[^>]*\/>[\s\S]*?<\/ac:link>/g,
+    (match, userkey) => {
+      return `<span style="color: rgb(24, 104, 219);">@[USER:${userkey}]</span>`;
+    });
+
   // Handle time
   html = html.replace(/<time datetime="([^"]+?)" \/>/g,
     (match, datetime) => {
