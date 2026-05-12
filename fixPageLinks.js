@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { default: pLimit } = require('p-limit');
 const { AxiosAdapter } = require('./axiosAdapter.js');
 
 const credentials = {
@@ -9,10 +10,6 @@ const credentials = {
 
 const axios = new AxiosAdapter(credentials.url, credentials.id, credentials.secret);
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Rate limiting configuration
-const BASE_DELAY = 300;
 const SUBPAGE_SEPARATOR = ' / '
 
 function fixPageLinksInHtml(html, spacePagesMapping) {
@@ -43,58 +40,61 @@ function fixPageLinksInHtml(html, spacePagesMapping) {
 async function fixPageLinks(reporter, pages, spacePagesMapping) {
   let totalReplacements = 0;
   let pagesUpdated = 0;
+  let progress = 0;
 
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
+  const limit = pLimit(5);
 
-    try {
-      const pageDetails = await axios.getPageDetails(page.id);
-      const html = pageDetails.html || '';
+  await Promise.all(
+    pages.map((page, i) =>
+      limit(async () => {
+        try {
+          const pageDetails = await axios.getPageDetails(page.id);
+          const html = pageDetails.html || '';
 
-      if (!html.includes('%5BPAGE') && !html.includes('PAGE:') && !html.includes('&#91;PAGE')) {
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:pagelinks',
-            message: `Skipped "${page.name}"`,
-            current: i + 1,
-            total: pages.length
-          });
+          if (!html.includes('%5BPAGE') && !html.includes('PAGE:') && !html.includes('&#91;PAGE')) {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:pagelinks',
+                message: `Skipped "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+            return;
+          }
+
+          const { updatedHtml, replacements } = fixPageLinksInHtml(html, spacePagesMapping);
+
+          if (replacements > 0 && updatedHtml !== html) {
+
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
+            totalReplacements += replacements;
+            pagesUpdated++;
+
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:pagelinks',
+                message: `Fixed ${replacements} links in "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          } else {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:pagelinks',
+                message: `Cannot fix "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          }
+        } catch (err) {
+          if (reporter) reporter.warning({ phase: 'cleanup:pagelinks', message: `Error on "${page.name}": ${err.message}` });
         }
-        continue;
-      }
-
-      const { updatedHtml, replacements } = fixPageLinksInHtml(html, spacePagesMapping);
-
-      if (replacements > 0 && updatedHtml !== html) {
-
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
-        totalReplacements += replacements;
-        pagesUpdated++;
-
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:pagelinks',
-            message: `Fixed ${replacements} links in "${page.name}"`,
-            current: i + 1,
-            total: pages.length
-          });
-        }
-      } else {
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:pagelinks',
-            message: `Cannot fix "${page.name}"`,
-            current: i + 1,
-            total: pages.length
-          });
-        }
-      }
-
-      await sleep(BASE_DELAY);
-    } catch (err) {
-      if (reporter) reporter.warning({ phase: 'cleanup:pagelinks', message: `Error on "${page.name}": ${err.message}` });
-    }
-  }
+      })
+    )
+  );
 
   return { totalReplacements, pagesUpdated };
 }
@@ -109,16 +109,22 @@ async function runFixPageLinksForAll(reporter) {
   const spacePagesMapping = {};
   const bookSpaceMapping = {};
 
-  for (let shelve of shelves) {
-    const shelf = (await axios.get(`/shelves/${shelve.id}`)).data;
-    let space = shelf.tags.find(tag => tag.name == 'space')?.value;
-    if (space) {
-      spacePagesMapping[space] = [];
-      for (let book of shelf.books) {
-        bookSpaceMapping[book.id] = space;
-      }
-    }
-  }
+  const limit = pLimit(5);
+
+  await Promise.all(
+    shelves.map((shelve, i) =>
+      limit(async () => {
+        const shelf = (await axios.get(`/shelves/${shelve.id}`)).data;
+        let space = shelf.tags.find(tag => tag.name == 'space')?.value;
+        if (space) {
+          spacePagesMapping[space] = [];
+          for (let book of shelf.books) {
+            bookSpaceMapping[book.id] = space;
+          }
+        }
+      })
+    )
+  );
 
   let totalReplacements = 0;
   let pagesUpdated = 0;
