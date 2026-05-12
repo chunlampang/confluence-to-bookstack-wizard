@@ -161,6 +161,30 @@ class AxiosAdapter {
     return this.delete('/chapters', id)
   }
 
+  async getAllShelves() {
+    let allShelves = [];
+
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const response = await withRetry(
+        () => this.get('/shelves', { offset, count: limit }),
+        'getAllShelves'
+      );
+
+      const pages = response.data.data;
+      allShelves = allShelves.concat(pages);
+
+      if (pages.length < limit) break;
+      offset += limit;
+      await sleep(BASE_DELAY);
+    }
+
+    console.log(`Found ${allShelves.length} shelves in BookStack`);
+    return allShelves;
+  }
+
   async getAllAttachments() {
     let allAttachments = [];
     let offset = 0;
