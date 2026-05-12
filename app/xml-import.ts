@@ -496,23 +496,24 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
 
       // Create general page for the book with its content
       const bodyHtml = getPageBody(childPage);
-      const html = convertStorageToHtml(bodyHtml, childPage.id);
+      if (bodyHtml) { // skip folder
+        const html = convertStorageToHtml(bodyHtml, childPage.id);
 
-      const pageResp = await axios.createPage({
-        book_id: bookId,
-        name: '_General',
-        html: html || '<p></p>'
-      });
-      pageCount++;
+        const pageResp = await axios.createPage({
+          book_id: bookId,
+          name: '_General',
+          html: html || '<p></p>'
+        });
+        pageCount++;
 
-      // Map page ID for attachments
-      if (attachmentsByPage[childPage.id]) {
-        attachmentsByPage[childPage.id].pageNewId = pageResp.data.id;
+        // Map page ID for attachments
+        if (attachmentsByPage[childPage.id]) {
+          attachmentsByPage[childPage.id].pageNewId = pageResp.data.id;
+        }
+
+        log(`  ✓ Created general page for: ${childPage.title}`, 'success');
+        progress('books', `Created general page for: ${childPage.title}`, bookCount, totalBooks);
       }
-
-      log(`  ✓ Created general page for: ${childPage.title}`, 'success');
-      progress('books', `Created general page for: ${childPage.title}`, bookCount, totalBooks);
-
     } catch (err: any) {
       log(`✗ Error creating book ${childPage.title}: ${err.message}`, 'error');
     }
@@ -533,6 +534,8 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   const createPage = async function (page: PageData, params: { [key: string]: any }) {
     try {
       const pageBodyHtml = getPageBody(page);
+      if (!pageBodyHtml) return false; // skip folder
+
       const pageHtml = convertStorageToHtml(pageBodyHtml, page.id);
 
       const pageResp = await axios.createPage({
