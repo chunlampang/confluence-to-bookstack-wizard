@@ -50,6 +50,7 @@ interface BodyContentData {
 
 let shelfId: number;
 let spaceTitle: string;
+let spaceKey: string;
 let pages: Map<string, PageData> = new Map();
 let attachments: Map<string, AttachmentData> = new Map();
 let bodyContents: Map<string, BodyContentData> = new Map();
@@ -64,11 +65,15 @@ let attachmentsByPage: {
 function parseEntitiesXml(xmlContent: string) {
   console.log('Parsing entities.xml...');
 
-  const spaceTitleRegex = /<object class="Space" package="com\.atlassian\.confluence\.spaces">[\s\S]*?<property[^>]*><!\[CDATA\[(.*?)\]\]><\/property>/;
+  const spaceTitleRegex = /<object class="Space" package="com\.atlassian\.confluence\.spaces">[\s\S]*?<property[^>]*name="name"[^>]*><!\[CDATA\[(.*?)\]\]><\/property>/;
   let spaceTitleMatch = spaceTitleRegex.exec(xmlContent);
-  if (spaceTitleMatch) {
-    spaceTitle = spaceTitleMatch[1]
-  }
+  if (spaceTitleMatch)
+    spaceTitle = spaceTitleMatch[1];
+
+  const spaceKeyRegex = /<object class="Space" package="com\.atlassian\.confluence\.spaces">[\s\S]*?<property[^>]*name="key"[^>]*><!\[CDATA\[(.*?)\]\]><\/property>/;
+  let spaceKeyMatch = spaceKeyRegex.exec(xmlContent);
+  if (spaceKeyMatch)
+    spaceKey = spaceKeyMatch[1];
 
   // Parse Page objects
   const pageRegex = /<object class="Page" package="com\.atlassian\.confluence\.pages">([\s\S]*?)<\/object>/g;
@@ -409,7 +414,12 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
   // Create shelf
   if (reporter) reporter.start({ phase: 'shelves', message: 'Creating shelf...' });
   progress('shelves', `Creating shelf: ${spaceTitle}`, 0, 1);
-  const shelfResp = await axios.createShelf({ name: spaceTitle });
+  const shelfResp = await axios.createShelf({
+    name: spaceTitle,
+    tags: [
+      { name: 'space', value: spaceKey },
+    ]
+  });
   shelfId = shelfResp.data.id;
   shelfCount++;
   log(`✓ Created shelf: ${spaceTitle} (ID: ${shelfId})`, 'success');
@@ -449,7 +459,12 @@ async function createBookStackStructure(reporter?: any): Promise<{ shelves: numb
     progress('books', `Creating book ${i + 1}/${totalBooks}: ${childPage.title}`, i, totalBooks);
 
     try {
-      const bookResp = await axios.createBook({ name: childPage.title });
+      const bookResp = await axios.createBook({
+        name: childPage.title,
+        tags: [
+          { name: 'space', value: spaceKey },
+        ]
+      });
       const bookId = bookResp.data.id;
       bookIds.push(bookId);
       bookCount++;
