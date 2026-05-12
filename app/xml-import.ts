@@ -240,13 +240,15 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
     });
 
   // confluence link
-  html = html.replace(/<ac:link[^>]*>[\s\S]*?<ri:page[^>]*ri:content-title="([\s\S]*?)"[^>]*ri:space-key="([\s\S]*?)"[^>]*>[\s\S]*?<ac:link-body>([\s\S]*?)<\/ac:link-body>[\s\S]*?<\/ac:link>/g,
-    (match, pageTitle, pageSpace, title) => {
+  html = html.replace(/<ac:link[^>]*>[\s\S]*?<ri:page([^>]*)>[\s\S]*?<ac:link-body>([\s\S]*?)<\/ac:link-body>[\s\S]*?<\/ac:link>/g,
+    (match, pageMeta, title) => {
+      let pageTitle = pageMeta.match(/ri:content-title="([^"]+?)"/)?.[1];
+      let pageSpace = pageMeta.match(/ri:space-key="([^"]+?)"/)?.[1] || spaceKey;
       return `<a href="[PAGE:${pageSpace}:${pageTitle}]">${title}</a>`;
     });
 
   // Handle time
-  html = html.replace(/<time datetime="(.*?)" \/>/g,
+  html = html.replace(/<time datetime="([^"]+?)" \/>/g,
     (match, datetime) => {
       return `<span style="background-color: rgb(206, 212, 217);">${datetime}</span>`;
     });
