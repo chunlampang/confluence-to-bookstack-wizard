@@ -284,6 +284,12 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<p class="callout warning">${body}</p>`;
     });
 
+  // panel
+  html = html.replace(/<ac:structured-macro[^>]*ac:name="panel"[^>]*>([\s\S]*?)(<ac:parameter ac:name="bgColor">(.*?)<\/ac:parameter>)?([\s\S]*?)<\/ac:structured-macro>/g,
+    (match, body1, _, bgColor, body2) => {
+      return `<table style="background-color:${bgColor?.toLowerCase() || 'grey'}"><tbody><tr><td>${body1}${body2}</td></tr></tbody></table>`;
+    });
+
   // Convert structured macros (just remove them for now or convert to divs)
   html = html.replace(/<ac:structured-macro[^>]*>([\s\S]*?)<\/ac:structured-macro>/g,
     (match, body) => {
