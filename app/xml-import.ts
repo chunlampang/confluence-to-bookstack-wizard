@@ -4,6 +4,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { AxiosAdapter } = require('../axiosAdapter.js');
+const { SUBPAGE_SEPARATOR } = require('../fixPageLinks.js');
 
 let fileDirectory = process.env.PATH_TO_HTML;
 let subDirectory: string;
@@ -238,6 +239,12 @@ function convertStorageToHtml(storageFormat: string, pageId: string): string {
       return `<a href="[ATTACHMENT:${filename}]">${filename}</a>`;
     });
 
+  // confluence link
+  html = html.replace(/<ac:link[^>]*>[\s\S]*?<ri:page[^>]*ri:content-title="([\s\S]*?)"[^>]*ri:space-key="([\s\S]*?)"[^>]*>[\s\S]*?<ac:link-body>([\s\S]*?)<\/ac:link-body>[\s\S]*?<\/ac:link>/g,
+    (match, pageTitle, pageSpace, title) => {
+      return `<a href="[PAGE:${pageSpace}:${pageTitle}]">${title}</a>`;
+    });
+
   // Handle time
   html = html.replace(/<time datetime="(.*?)" \/>/g,
     (match, datetime) => {
@@ -319,7 +326,7 @@ function buildHierarchy(): Map<string | null, PageData[]> {
           const subpages = hierarchy.get(page.id) || [];
           for (const subpage of subpages) {
             if (titlePrefix)
-              subpage.title = `${titlePrefix} / ${subpage.title}`;
+              subpage.title = `${titlePrefix}${SUBPAGE_SEPARATOR}${subpage.title}`;
             flatPages.push(subpage);
             flatten(subpage, subpage.title);
           }
