@@ -12,7 +12,7 @@ const axios = new AxiosAdapter(credentials.url, credentials.id, credentials.secr
 
 const SUBPAGE_SEPARATOR = ' / '
 
-function fixPageLinksInHtml(html, spacePagesMapping) {
+function fixPageLinksInHtml(html, spacePagesMapping, spaceBooksMapping) {
   let updatedHtml = html;
   let replacements = 0;
 
@@ -28,6 +28,12 @@ function fixPageLinksInHtml(html, spacePagesMapping) {
         if (page) {
           replacements++;
           return `<a href="/books/${page.book_slug}/page/${page.slug}">`;
+        } else {
+          let book = spaceBooksMapping[space]?.find(b => b.name == name);
+          if (book) {
+            replacements++;
+            return `<a href="/books/${book.slug}">`;
+          }
         }
       }
 
@@ -37,7 +43,7 @@ function fixPageLinksInHtml(html, spacePagesMapping) {
   return { updatedHtml, replacements };
 }
 
-async function fixPageLinks(reporter, pages, spacePagesMapping) {
+async function fixPageLinks(reporter, pages, spacePagesMapping, spaceBooksMapping) {
   let totalReplacements = 0;
   let pagesUpdated = 0;
   let progress = 0;
@@ -63,7 +69,7 @@ async function fixPageLinks(reporter, pages, spacePagesMapping) {
             return;
           }
 
-          const { updatedHtml, replacements } = fixPageLinksInHtml(html, spacePagesMapping);
+          const { updatedHtml, replacements } = fixPageLinksInHtml(html, spacePagesMapping, spaceBooksMapping);
 
           if (replacements > 0 && updatedHtml !== html) {
 
@@ -107,6 +113,7 @@ async function runFixPageLinksForAll(reporter) {
   const shelves = await axios.getAllShelves();
 
   const spacePagesMapping = {};
+  const spaceBooksMapping = {};
   const bookSpaceMapping = {};
 
   const limit = pLimit(5);
@@ -118,6 +125,11 @@ async function runFixPageLinksForAll(reporter) {
         let space = shelf.tags.find(tag => tag.name == 'space')?.value;
         if (space) {
           spacePagesMapping[space] = [];
+
+          if (!spaceBooksMapping[space])
+            spaceBooksMapping[space] = [...shelf.books];
+          else
+            spaceBooksMapping[space].concat(shelf.books);
           for (let book of shelf.books) {
             bookSpaceMapping[book.id] = space;
           }
@@ -139,7 +151,7 @@ async function runFixPageLinksForAll(reporter) {
       }
     }
 
-    const result = await fixPageLinks(reporter, hasSpacePages, spacePagesMapping);
+    const result = await fixPageLinks(reporter, hasSpacePages, spacePagesMapping, spaceBooksMapping);
     totalReplacements = result.totalReplacements;
     pagesUpdated = result.pagesUpdated;
   }
@@ -163,8 +175,9 @@ async function runFixPageLinks(reporter, shelfId) {
   const shelf = (await axios.get('/shelves/' + shelfId)).data;
   const space = shelf.tags.find(tag => tag.name == 'space')?.value;
   const spacePagesMapping = { [space]: pages };
+  const spaceBooksMapping = { [space]: shelf.books };
 
-  const result = await fixPageLinks(reporter, pages, spacePagesMapping);
+  const result = await fixPageLinks(reporter, pages, spacePagesMapping, spaceBooksMapping);
   let totalReplacements = result.totalReplacements;
   let pagesUpdated = result.pagesUpdated;
 
