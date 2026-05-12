@@ -20,7 +20,7 @@ function fixPageLinksInHtml(html, spacePagesMapping, spaceBooksMapping) {
   let replacements = 0;
 
   // Fix page link
-  updatedHtml = html.replace(/<a href="(http[^\]"']+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)PAGE(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"']+?)(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"']+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)">/g,
+  updatedHtml = html.replace(/<a href="(http[^\]"]+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)PAGE(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"]+?)(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"]+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)">/g,
     (match, baseUrl, space, title) => {
       if (title) {
         let name = decodeURIComponent(title);
