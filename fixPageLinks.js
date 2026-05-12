@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { decode } = require('html-entities');
 const { AxiosAdapter } = require('./axiosAdapter.js');
 
 const credentials = {
@@ -23,7 +24,7 @@ function fixPageLinksInHtml(html, spacePagesMapping, spaceBooksMapping) {
   updatedHtml = html.replace(/<a href="(http[^\]"]+?\/)?(?:\[|%5[Bb]|&#91;|&#x5[Bb];)PAGE(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"]+?)(?:\:|%3[Aa]|&#58;|&#x3[Aa];)([^\]"]+?)(?:\]|%5[Dd]|&#93;|&#x5[Dd];)">/g,
     (match, baseUrl, space, title) => {
       if (title) {
-        let name = decodeURIComponent(title);
+        let name = decode(decodeURIComponent(title));
         let page = spacePagesMapping[space]?.find(
           p => p.name == name
             || p.name.endsWith(SUBPAGE_SEPARATOR + name) // subpage
@@ -192,7 +193,7 @@ module.exports = { SUBPAGE_SEPARATOR, runFixPageLinks, runFixPageLinksForAll };
 if (require.main === module) {
   runFixPageLinksForAll({
     start: d => console.log(d.message),
-    progress: d => console.log(d.message, `(${d.current}/${d.total})`),
+    progress: d => !d.message.startsWith('Skipped') && console.log(d.message, `(${d.current}/${d.total})`),
     warning: d => console.warn(d.message),
     complete: d => console.log(d.message),
   }).catch(err => {
