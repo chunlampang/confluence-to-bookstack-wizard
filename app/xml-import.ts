@@ -3,6 +3,7 @@ import { attachmentRecords } from '../outputJS/attachmentsFile'
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { default: pLimit } = require('p-limit');
 const { AxiosAdapter } = require('../axiosAdapter.js');
 
 let fileDirectory = process.env.PATH_TO_HTML;
