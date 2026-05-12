@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { default: pLimit } = require('p-limit');
 const { AxiosAdapter } = require('./axiosAdapter.js');
 const { attachmentRecords } = require('./outputJS/attachmentsFile');
 
@@ -198,57 +199,61 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
   let pagesUpdated = 0;
   let progress = 0;
 
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
+  const limit = pLimit(5);
 
-    try {
-      const pageDetails = await axios.getPageDetails(page.id);
-      const html = pageDetails.html || '';
+  await Promise.all(
+    pages.map((page, i) =>
+      limit(async () => {
+        try {
+          const pageDetails = await axios.getPageDetails(page.id);
+          const html = pageDetails.html || '';
 
-      if (!html.includes('src="attachments/') && !html.includes("src='attachments/")) {
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:images',
-            message: `Skipped "${page.name}"`,
-            current: ++progress,
-            total: pages.length
-          });
+          if (!html.includes('src="attachments/') && !html.includes("src='attachments/")) {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:images',
+                message: `Skipped "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+            return;
+          }
+
+          const attachments = await axios.getPageAttachments(page.id);
+          const attachmentLookup = buildAttachmentLookup(attachments);
+
+          const { updatedHtml, replacements } = fixEmbeddedImagesInHtml(html, pathMap, attachmentLookup);
+
+          if (updatedHtml !== html) {
+            await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
+            totalReplacements += replacements;
+            pagesUpdated++;
+
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:images',
+                message: `Fixed ${replacements} images in "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          } else {
+            if (reporter) {
+              reporter.progress({
+                phase: 'cleanup:images',
+                message: `Cannot fix "${page.name}"`,
+                current: ++progress,
+                total: pages.length
+              });
+            }
+          }
+        } catch (err) {
+          if (reporter) reporter.warning({ phase: 'cleanup:images', message: `Error on "${page.name}": ${err.message}` });
         }
-        continue;
-      }
-
-      const attachments = await axios.getPageAttachments(page.id);
-      const attachmentLookup = buildAttachmentLookup(attachments);
-
-      const { updatedHtml, replacements } = fixEmbeddedImagesInHtml(html, pathMap, attachmentLookup);
-
-      if (updatedHtml !== html) {
-        await axios.updatePageHtml(page.id, updatedHtml, pageDetails.name);
-        totalReplacements += replacements;
-        pagesUpdated++;
-
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:images',
-            message: `Fixed ${replacements} images in "${page.name}"`,
-            current: ++progress,
-            total: pages.length
-          });
-        }
-      } else {
-        if (reporter) {
-          reporter.progress({
-            phase: 'cleanup:images',
-            message: `Cannot fix "${page.name}"`,
-            current: ++progress,
-            total: pages.length
-          });
-        }
-      }
-    } catch (err) {
-      if (reporter) reporter.warning({ phase: 'cleanup:images', message: `Error on "${page.name}": ${err.message}` });
-    }
-  }
+      })
+    )
+  );
 
   if (reporter) reporter.complete({ phase: 'cleanup:images', message: `Fixed ${totalReplacements} embedded images in ${pagesUpdated} pages` });
   return { fixed: totalReplacements, pages: pagesUpdated };
