@@ -3,6 +3,7 @@ import { attachmentRecords } from '../outputJS/attachmentsFile'
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { encode: encodeHtml } = require('html-entities');
 const { AxiosAdapter } = require('../axiosAdapter.js');
 const { SUBPAGE_SEPARATOR } = require('../fixPageLinks.js');
 
@@ -164,14 +165,6 @@ function getPageBody(page: PageData): string {
     }
   }
   return '';
-}
-
-function encodeHtml(str: string) {
-  return str && str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 // Get MIME type from filename
