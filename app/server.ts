@@ -586,14 +586,16 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
       console.error('Attachment link fix error:', err);
     }
 
-    try {
-      const { runFixPageLinks } = require('../fixPageLinks.js');
-      reporter.log('cleanup', 'Fixing page links...', 'info');
-      await runFixPageLinks(reporter, result.shelfId);
-      reporter.log('cleanup', '✓ Page links fixed', 'success');
-    } catch (err: any) {
-      reporter.log('cleanup', `⚠ Page links fixing failed: ${err.message}`, 'warning');
-      console.error('Page links fix error:', err);
+    if (exportType === 'xml') {
+      try {
+        const { runFixPageLinks } = require('../fixPageLinks.js');
+        reporter.log('cleanup', 'Fixing page links...', 'info');
+        await runFixPageLinks(reporter, result.shelfId);
+        reporter.log('cleanup', '✓ Page links fixed', 'success');
+      } catch (err: any) {
+        reporter.log('cleanup', `⚠ Page links fixing failed: ${err.message}`, 'warning');
+        console.error('Page links fix error:', err);
+      }
     }
 
     try {
@@ -616,14 +618,16 @@ async function runImportJob(jobId: string, folder: string, exportType: string, r
       console.error('Placeholder removal error:', err);
     }
 
-    try {
-      const { runFixEmbeddedImages } = require('../fixEmbeddedImages.js');
-      reporter.log('cleanup', 'Fixing embedded images...', 'info');
-      await runFixEmbeddedImages(folder, reporter, result.shelfId);
-      reporter.log('cleanup', '✓ Embedded images fixed', 'success');
-    } catch (err: any) {
-      reporter.log('cleanup', `⚠ Embedded image fixing failed: ${err.message}`, 'warning');
-      console.error('Embedded image fix error:', err);
+    if (exportType !== 'xml') {
+      try {
+        const { runFixEmbeddedImages } = require('../fixEmbeddedImages.js');
+        reporter.log('cleanup', 'Fixing embedded images...', 'info');
+        await runFixEmbeddedImages(folder, reporter, result.shelfId);
+        reporter.log('cleanup', '✓ Embedded images fixed', 'success');
+      } catch (err: any) {
+        reporter.log('cleanup', `⚠ Embedded image fixing failed: ${err.message}`, 'warning');
+        console.error('Embedded image fix error:', err);
+      }
     }
 
     // Clear all attachment records now that import is complete
