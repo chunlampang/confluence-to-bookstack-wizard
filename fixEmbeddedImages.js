@@ -192,7 +192,7 @@ async function runFixEmbeddedImages(subDirectory, reporter, shelfId) {
     return { fixed: 0, pages: 0 };
   }
 
-  const pages = await axios.getAllPagesByShelf(shelfId);
+  const pages = await (shelfId ? axios.getAllPagesByShelf(shelfId) : axios.getAllPages());
 
   let totalReplacements = 0;
   let pagesUpdated = 0;

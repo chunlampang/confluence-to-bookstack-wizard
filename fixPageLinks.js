@@ -163,6 +163,9 @@ async function runFixPageLinksForAll(reporter) {
 
 // Exported function for web interface
 async function runFixPageLinks(reporter, shelfId) {
+  if (!shelfId)
+    return runFixPageLinksForAll(reporter);
+
   if (reporter) reporter.start({ phase: 'cleanup:pagelinks', message: 'Fixing page links...' });
 
   const pages = await axios.getAllPagesByShelf(shelfId);
