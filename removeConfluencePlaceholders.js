@@ -103,7 +103,7 @@ if (require.main === module) {
 async function runRemoveConfluencePlaceholders(reporter, shelfId) {
   if (reporter) reporter.start({ phase: 'cleanup:placeholders', message: 'Removing Confluence placeholders...' });
 
-  const pages = await axios.getAllPagesByShelf(shelfId);
+  const pages = await (shelfId ? axios.getAllPagesByShelf(shelfId) : axios.getAllPages());
 
   let totalRemovals = 0;
   let pagesUpdated = 0;

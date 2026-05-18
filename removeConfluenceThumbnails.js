@@ -132,7 +132,7 @@ if (require.main === module) {
 async function runRemoveConfluenceThumbnails(reporter, shelfId) {
   if (reporter) reporter.start({ phase: 'cleanup:thumbnails', message: 'Removing Confluence thumbnails...' });
 
-  const pages = await axios.getAllPagesByShelf(shelfId);
+  const pages = await (shelfId ? axios.getAllPagesByShelf(shelfId) : axios.getAllPages());
 
   let totalRemovals = 0;
   let pagesUpdated = 0;
